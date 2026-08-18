@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hill Cryptanalysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+</head>
+
+<body data-bs-theme="dark" style="font-family: 'Courier New', Courier, monospace;">
+    <div class="d-flex align-items-center justify-content-center" style="height: 100vh;">
+        <div style="width: 75vw;">
+            <h1 class="fw-bold">HILL CRYPTANALYSIS</h1>
+            <hr>
+
+            <!-- Error Message Display -->
+            {% if error %}
+            <div class="alert alert-danger rounded-0" role="alert">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <!-- Added Form Tag -->
+            <form method="POST" action="/hill/kasiski">
+                <textarea class="form-control rounded-0 border-1 border-light" placeholder="Enter first known plaintext..."
+                    id="firstKnownPlaintext" style="height: 80px" required
+                    oninput="buildPairs(this, 'pairsContainer')"></textarea>
+
+                <input type="hidden" name="matrix_size" id="matrixSize" value="0">
+                <div id="pairsContainer"></div>
+                <textarea name="full_ciphertext" class="form-control rounded-0 border-1 mt-3 border-light"
+                    placeholder="Enter full ciphertext..." style="height: 80px">{{ full_ciphertext if full_ciphertext else '' }}</textarea>
+
+                <button type="submit" class="btn btn-light rounded-0 mt-3">RECOVER KEY</button>
+            </form>
+
+            <!-- Results Display Block -->
+            {% if decrypted_message %}
+            <div class="mt-4 p-3 border border-light">
+                <h5 class="fw-bold text-success">Analysis Complete</h5>
+                <p class="mb-1"><strong>Matrix Size (n):</strong> {{ matrix_size }}</p>
+                <p class="mb-1"><strong>Recovered Key Matrix:</strong></p>
+                <pre class="mb-1">{{ recovered_key }}</pre>
+                <hr>
+                <p class="mb-0"><strong>Deciphered Message:</strong><br>
+                <span style="overflow-wrap: break-word;">{{ decrypted_message }}</span></p>
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+        crossorigin="anonymous"></script>
+
+    <script>
+    function cleanLength(str) {
+        return str.replace(/[^a-zA-Z]/g, '').length;
+    }
+
+    function buildPairs(source, containerId) {
+        const n = cleanLength(source.value);
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        document.getElementById('matrixSize').value = n;
+
+        if (n === 0) {
+            return;
+        }
+
+        container.insertAdjacentHTML('beforeend',
+            `<p class="mb-2 mt-3">Provide ${n} known plaintext/ciphertext pairs, each exactly ${n} letters long (pair #1 uses the text above):</p>`);
+
+        for (let i = 1; i <= n; i++) {
+            const row = document.createElement('div');
+            row.className = 'row g-2 mb-2';
+
+            const ptCol = document.createElement('div');
+            ptCol.className = 'col-6';
+            const ptInput = document.createElement('input');
+            ptInput.type = 'text';
+            ptInput.name = `known_pt_${i}`;
+            ptInput.placeholder = `Known plaintext #${i}`;
+            ptInput.required = true;
+            ptInput.className = 'form-control rounded-0 border-1 border-light';
+            if (i === 1) {
+                ptInput.value = source.value;
+                ptInput.readOnly = true;
+            }
+            ptCol.appendChild(ptInput);
+
+            const ctCol = document.createElement('div');
+            ctCol.className = 'col-6';
+            const ctInput = document.createElement('input');
+            ctInput.type = 'text';
+            ctInput.name = `known_ct_${i}`;
+            ctInput.placeholder = `Known ciphertext #${i}`;
+            ctInput.required = true;
+            ctInput.className = 'form-control rounded-0 border-1 border-light';
+            ctCol.appendChild(ctInput);
+
+            row.appendChild(ptCol);
+            row.appendChild(ctCol);
+            container.appendChild(row);
+        }
+    }
+    </script>
+</body>
+
+</html>

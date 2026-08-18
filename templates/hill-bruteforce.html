@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Hill Bruteforce</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <style>
+        .pulse-fade {
+            animation: pulse-opacity 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse-opacity {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+    </style>
+</head>
+<body data-bs-theme="dark" style="font-family: 'Courier New', Courier, monospace; overflow-x: hidden;">
+    <div class="d-flex flex-column align-items-center justify-content-center min-vh-100 py-5">
+
+        <!-- Input Form[cite: 9] -->
+        <form id="bruteforce-form" style="width: 75vw; max-width: 800px;">
+            <h1 class="fw-bold">GROVER'S HILL BRUTEFORCE</h1>
+            <p class="text-muted mb-4">Note: Toy model uses a 4-letter alphabet (A, B, C, D) and a 2x2 matrix.</p>
+            <hr>
+
+            {% if error %}
+            <div class="alert alert-danger rounded-0 border-1 border-danger" role="alert" id="error-alert">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <div class="mb-3">
+                <label for="plaintext" class="form-label">Known Plaintext (2 Letters)</label>
+                <input type="text" class="form-control rounded-0 border-1 border-light text-uppercase" id="plaintext"
+                    name="plaintext" placeholder="e.g. AB" value="{{ plaintext | default('') }}" maxlength="2" required>
+            </div>
+            <div class="mb-3">
+                <label for="ciphertext" class="form-label">Known Ciphertext (2 Letters)</label>
+                <input type="text" class="form-control rounded-0 border-1 border-light text-uppercase" id="ciphertext"
+                    name="ciphertext" placeholder="e.g. CD" value="{{ ciphertext | default('') }}" maxlength="2" required>
+            </div>
+
+            <button class="btn btn-light rounded-0 mt-3 fw-bold w-100" type="submit" id="submit-btn">EXECUTE QUANTUM ATTACK</button>
+        </form>
+
+        <!-- Loading Animation Section[cite: 9] -->
+        <div id="loading-section" class="mt-5 text-center" style="display: none;">
+            <img src="{{ url_for('static', filename='qiskit_logo.png') }}" class="pulse-fade" style="width: 200px;" alt="">
+            <h4 class="mt-3 fw-bold text-light pulse-fade">Running Quantum Circuit...</h4>
+            <p class="text-muted pulse-fade">Building matrix oracle and amplifying amplitudes.</p>
+        </div>
+
+        <!-- Results Section[cite: 9] -->
+        {% if results %}
+        <div class="mt-5" id="results-section" style="width: 75vw; max-width: 800px;">
+            <h2 class="fw-bold text-success">ATTACK SUCCESSFUL</h2>
+            <hr>
+
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h5 class="fw-bold text-decoration-underline">Attack Parameters</h5>
+                    <p class="mb-1"><strong>Search Space ($N$):</strong> {{ results.N }} possible matrices</p>
+                    <p class="mb-1"><strong>Valid Keys Found:</strong> {{ results.num_solutions }}</p>
+                    <p class="mb-1"><strong>Grover Iterations:</strong> {{ results.iterations }}</p>
+                </div>
+                <div class="col-md-6 border-start border-light bg-dark p-3 text-center">
+                    <h5 class="fw-bold text-info">Decoded Matrix Key</h5>
+                    <div class="d-inline-block border border-2 border-warning p-2 mt-2">
+                        <div class="d-flex justify-content-center gap-4 mb-2 fs-4 fw-bold">
+                            <span>{{ results.found_matrix[0][0] }}</span>
+                            <span>{{ results.found_matrix[0][1] }}</span>
+                        </div>
+                        <div class="d-flex justify-content-center gap-4 fs-4 fw-bold">
+                            <span>{{ results.found_matrix[1][0] }}</span>
+                            <span>{{ results.found_matrix[1][1] }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h5 class="fw-bold text-decoration-underline mt-4">Probability Distribution</h5>
+            <div class="border border-1 border-light p-2 mb-4 bg-dark text-center">
+                <img src="data:image/png;base64,{{ results.hist_b64 }}" class="img-fluid" alt="Probability Histogram">
+            </div>
+
+            <h5 class="fw-bold text-decoration-underline">Quantum Circuit (8 Qubits)</h5>
+            <div class="border border-1 border-light p-2 mb-4 bg-dark text-center overflow-auto">
+                <img src="data:image/png;base64,{{ results.circuit_b64 }}" class="img-fluid" alt="Quantum Circuit">
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+
+    <script>
+        document.getElementById('bruteforce-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            document.getElementById('loading-section').style.display = 'block';
+            document.getElementById('submit-btn').style.display = 'none';
+            
+            const resultsSection = document.getElementById('results-section');
+            if (resultsSection) resultsSection.style.display = 'none';
+            const errorAlert = document.getElementById('error-alert');
+            if (errorAlert) errorAlert.style.display = 'none';
+
+            const formData = new FormData(this);
+
+            try {
+                // Ensure this points to the new Hill endpoint
+                const response = await fetch('/hill/bruteforce', { 
+                    method: 'POST',
+                    body: formData
+                });
+                const htmlText = await response.text();
+                document.open();
+                document.write(htmlText);
+                document.close();
+            } catch (error) {
+                document.getElementById('loading-section').innerHTML = '<h4 class="text-danger fw-bold mt-3">An error occurred. Please try again.</h4>';
+                document.getElementById('submit-btn').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

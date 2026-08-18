@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Bruteforce</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <style>
+        .pulse-fade {
+            animation: pulse-opacity 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-opacity {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+                /* Fades out halfway */
+            }
+        }
+    </style>
+</head>
+
+<body data-bs-theme="dark" style="font-family: 'Courier New', Courier, monospace; overflow-x: hidden;">
+    <div class="d-flex flex-column align-items-center justify-content-center min-vh-100 py-5">
+
+        <!-- Input Form -->
+        <form id="bruteforce-form" style="width: 75vw; max-width: 800px;">
+            <h1 class="fw-bold">GROVER'S VIGENÈRE BRUTEFORCE </h1>
+            <p class="text-muted mb-4">Note: Due to simulator limits, this uses a 4-letter alphabet (A, B, C, D).</p>
+            <hr>
+
+            {% if error %}
+            <div class="alert alert-danger rounded-0 border-1 border-danger" role="alert" id="error-alert">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <div class="mb-3">
+                <label for="plaintext" class="form-label">Known Plaintext</label>
+                <input type="text" class="form-control rounded-0 border-1 border-light text-uppercase" id="plaintext"
+                    name="plaintext" placeholder="e.g. AB" value="{{ plaintext | default('') }}" required>
+            </div>
+            <div class="mb-3">
+                <label for="ciphertext" class="form-label">Known Ciphertext</label>
+                <input type="text" class="form-control rounded-0 border-1 border-light text-uppercase" id="ciphertext"
+                    name="ciphertext" placeholder="e.g. DD" value="{{ ciphertext | default('') }}" required>
+            </div>
+
+            <button class="btn btn-light rounded-0 mt-3" type="submit" id="submit-btn">EXECUTE QUANTUM
+                ATTACK</button>
+        </form>
+
+        <!-- Loading Animation Section (Hidden by Default) -->
+        <div id="loading-section" class="mt-5 text-center" style="display: none;">
+            <!-- <div class="spinner-border text-info" style="width: 4rem; height: 4rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div> -->
+            <img src="{{ url_for('static', filename='qiskit_logo.png') }}" class="pulse-fade" style="width: 200px;" alt="">
+            <h4 class="mt-3 fw-bold text-light pulse-fade">Running Quantum Circuit...</h4>
+            <p class="text-muted pulse-fade">Building the oracle and running amplitude amplification.</p>
+        </div>
+
+        <!-- Results Section -->
+        {% if results %}
+        <div class="mt-5" id="results-section" style="width: 75vw; max-width: 800px;">
+            <h2 class="fw-bold text-success">ATTACK SUCCESSFUL</h2>
+            <hr>
+
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h5 class="fw-bold text-decoration-underline">Attack Parameters</h5>
+                    <p class="mb-1"><strong>Search Space (N):</strong> {{ results.N }} possible keys</p>
+                    <p class="mb-1"><strong>Grover Iterations:</strong> {{ results.iterations }}</p>
+                    <p class="mb-1 text-muted"><em>(Classical brute-force expected: ~{{ results.N / 2 }} attempts)</em>
+                    </p>
+                </div>
+                <div class="col-md-6 border-start border-light">
+                    <h5 class="fw-bold text-decoration-underline">Measurement Data</h5>
+                    <p class="mb-1"><strong>Most Frequent State:</strong> <span class="text-info">{{
+                            results.measured_bin }}</span></p>
+                    <p class="mb-1"><strong>Decoded Key:</strong> <span class="text-warning fs-5 fw-bold">{{
+                            results.found_key }}</span></p>
+                    <p class="mb-1"><strong>Target Matched:</strong> {{ results.success }}</p>
+                </div>
+            </div>
+
+            <h5 class="fw-bold text-decoration-underline mt-4">Probability Distribution (Amplitude Amplification)</h5>
+            <div class="border border-1 border-light p-2 mb-4 bg-dark text-center">
+                <img src="data:image/png;base64,{{ results.hist_b64 }}" class="img-fluid" alt="Probability Histogram">
+            </div>
+
+            <h5 class="fw-bold text-decoration-underline">Quantum Circuit</h5>
+            <div class="border border-1 border-light p-2 mb-4 bg-dark text-center overflow-auto">
+                <img src="data:image/png;base64,{{ results.circuit_b64 }}" class="img-fluid" alt="Quantum Circuit">
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+        crossorigin="anonymous"></script>
+
+    <script>
+        document.getElementById('bruteforce-form').addEventListener('submit', async function (e) {
+            // Prevent the standard form submission
+            e.preventDefault();
+
+            // Show the loading spinner
+            document.getElementById('loading-section').style.display = 'block';
+
+            // Hide the submit button to prevent double-clicking
+            document.getElementById('submit-btn').style.display = 'none';
+
+            // Hide previous results or errors if they exist
+            const resultsSection = document.getElementById('results-section');
+            if (resultsSection) resultsSection.style.display = 'none';
+            const errorAlert = document.getElementById('error-alert');
+            if (errorAlert) errorAlert.style.display = 'none';
+
+            // Gather the form data
+            const formData = new FormData(this);
+
+            try {
+                // Send the POST request to the Flask backend
+                const response = await fetch('/vigenere/bruteforce', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                // Get the newly rendered HTML from Flask
+                const htmlText = await response.text();
+
+                // Replace the entire page's HTML seamlessly
+                document.open();
+                document.write(htmlText);
+                document.close();
+            } catch (error) {
+                console.error("Error submitting form:", error);
+
+                // Fallback in case the fetch fails
+                document.getElementById('loading-section').innerHTML = '<h4 class="text-danger fw-bold mt-3">An error occurred. Please try again.</h4>';
+                document.getElementById('submit-btn').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+
+</html>

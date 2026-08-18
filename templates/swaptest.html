@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Swap Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <style>
+        .pulse-fade {
+            animation: pulse-opacity 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-opacity {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+                /* Fades out halfway */
+            }
+        }
+    </style>
+</head>
+
+<body data-bs-theme="dark" style="font-family: 'Courier New', Courier, monospace; overflow-x: hidden;">
+    <div class="d-flex flex-column align-items-center justify-content-center min-vh-100 py-5">
+
+        <form id="swaptest-form" style="width: 75vw; max-width: 800px;">
+            <h1 class="fw-bold">STAGE - 3 : SWAP TEST</h1>
+            <p class="text-muted">Adjust the state weights to evaluate quantum similarity.</p>
+            <hr>
+
+            {% if error %}
+            <div class="alert alert-danger rounded-0 border-1 border-danger" role="alert" id="error-alert">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <div class="row bg-dark border border-1 border-light p-3 mb-4">
+                <div class="col-sm-6 border-end border-light">
+                    <h5 class="fw-bold text-info">STATE 1</h5>
+                    <label for="lang1" class="form-label mt-2">LANGUAGE 1 Weight:</label>
+                    <input type="range" min="0" max="1" value="{{ lang1 | default('0.0') }}" step="0.01"
+                        class="form-range" name="lang1" id="lang1"
+                        oninput="document.getElementById('val-lang1').innerText = this.value">
+
+                    <label for="ciph1" class="form-label mt-3">CIPHER 1 Weight:</label>
+                    <input type="range" min="0" max="1" value="{{ ciph1 | default('0.0') }}" step="0.01"
+                        class="form-range" name="ciph1" id="ciph1"
+                        oninput="document.getElementById('val-ciph1').innerText = this.value">
+                </div>
+
+                <div class="col-sm-6 ps-4">
+                    <h5 class="fw-bold text-info">STATE 2</h5>
+                    <!-- Corrected from your source HTML to lang2 and ciph2 -->
+                    <label for="lang2" class="form-label mt-2">LANGUAGE 2 Weight: </label>
+                    <input type="range" min="0" max="1" value="{{ lang2 | default('0.0') }}" step="0.01"
+                        class="form-range" name="lang2" id="lang2"
+                        oninput="document.getElementById('val-lang2').innerText = this.value">
+
+                    <label for="ciph2" class="form-label mt-3">CIPHER 2 Weight: </label>
+                    <input type="range" min="0" max="1" value="{{ ciph2 | default('0.0') }}" step="0.01"
+                        class="form-range" name="ciph2" id="ciph2"
+                        oninput="document.getElementById('val-ciph2').innerText = this.value">
+                </div>
+            </div>
+
+            <button class="btn btn-light rounded-0 w-100" type="submit" id="submit-btn">EVALUATE
+                SIMILARITY</button>
+        </form>
+
+        <!-- Loading Animation Section (Hidden by Default) -->
+        <div id="loading-section" class="mt-5 text-center" style="display: none;">
+            <!-- <div class="spinner-border text-info" style="width: 4rem; height: 4rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div> -->
+            <img src="{{ url_for('static', filename='qiskit_logo.png') }}" class="pulse-fade" style="width: 200px;"
+                alt="">
+            <h4 class="mt-3 fw-bold text-light pulse-fade">Running Quantum Circuit...</h4>
+            <p class="text-muted pulse-fade">Building the oracle and running amplitude amplification.</p>
+        </div>
+
+        <!-- Results Section -->
+        {% if results %}
+        <div class="mt-5" id="results-section" style="width: 75vw; max-width: 800px;">
+            <h2 class="fw-bold text-success">TEST COMPLETE</h2>
+            <hr>
+
+            <div class="row mb-4">
+                <div class="col-md-12 text-center bg-dark border border-1 border-light p-3">
+                    <h3 class="fw-bold text-warning mb-0">Estimated Similarity: {{ results.similarity }}%</h3>
+                    <p class="text-muted mt-2 mb-0">Probability of measuring |0⟩: {{ results.p0 }}</p>
+                </div>
+            </div>
+
+            <h5 class="fw-bold text-decoration-underline mt-4">Measurement Distribution</h5>
+            <div class="border border-1 border-light p-2 mb-4 bg-dark text-center">
+                <img src="data:image/png;base64,{{ results.hist_b64 }}" class="img-fluid" alt="Probability Histogram">
+            </div>
+
+            <h5 class="fw-bold text-decoration-underline">Quantum Circuit</h5>
+            <div class="border border-1 border-light p-2 mb-4 bg-dark text-center overflow-auto">
+                <img src="data:image/png;base64,{{ results.circuit_b64 }}" class="img-fluid" alt="Quantum Circuit">
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+        crossorigin="anonymous"></script>
+
+    <script>
+        document.getElementById('swaptest-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            document.getElementById('loading-section').style.display = 'block';
+            document.getElementById('submit-btn').style.display = 'none';
+
+            const resultsSection = document.getElementById('results-section');
+            if (resultsSection) resultsSection.style.display = 'none';
+
+            const formData = new FormData(this);
+
+            try {
+                const response = await fetch('/swaptest', {
+                    method: 'POST',
+                    body: formData
+                });
+                const htmlText = await response.text();
+                document.open();
+                document.write(htmlText);
+                document.close();
+            } catch (error) {
+                document.getElementById('loading-section').innerHTML = '<h4 class="text-danger fw-bold mt-3">Error executing simulation.</h4>';
+                document.getElementById('submit-btn').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+
+</html>
