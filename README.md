@@ -1,4 +1,4 @@
-# ISI–JCB–DRDO Project
+# ISI–DRDO Project
 
 ### Quantum Cryptanalysis of Polyalphabetic Cipher Cryptographic Schemes
 
@@ -588,7 +588,7 @@ For collaboration, research discussion, or technical questions, please use the r
 # Repository
 
 **GitHub:**
-[ISI–JCB–DRDO Project Repository](https://github.com/CodingDecodingGithub/ISI-DRDO-PROJECT?utm_source=chatgpt.com)
+[ISI–DRDO Project Repository](https://github.com/CodingDecodingGithub/ISI-DRDO-PROJECT?utm_source=chatgpt.com)
 
 ---
 
